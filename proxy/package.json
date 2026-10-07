@@ -1,0 +1,10 @@
+{
+  "name": "ledger-proxy",
+  "version": "1.0.0",
+  "description": "Tiny forwarding proxy that keeps your official-API key on a server with a fixed IP",
+  "type": "module",
+  "main": "server.js",
+  "bin": { "ledger-proxy": "server.js" },
+  "scripts": { "start": "node server.js", "test": "node --test test/*.test.js" },
+  "license": "MIT"
+}
