@@ -217,6 +217,8 @@ fun SettingsScreen(vm: LedgerViewModel, padding: PaddingValues) {
             }
         }
 
+        ApiSettingsSection(vm)
+
         // ---- backup ----
         SectionTitle("Backup")
         ElevatedCard(Modifier.fillMaxWidth()) {
@@ -239,7 +241,8 @@ fun SettingsScreen(vm: LedgerViewModel, padding: PaddingValues) {
         Text(
             "Builder's Ledger is a fan-made planning tool. This material is unofficial and is not endorsed by Supercell. " +
                 "For more information see Supercell's Fan Content Policy. It reads nothing from the game itself: " +
-                "you paste the game's own data export or type values in, and everything stays on your device.",
+                "you paste the game's own data export or type values in. Your data stays on your device; the only network " +
+                "use is the optional, off-by-default official-API progress sync above.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

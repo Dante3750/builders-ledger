@@ -7,9 +7,14 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.buildersledger.LedgerApplication
 import com.buildersledger.data.ImportSummary
+import com.buildersledger.data.CachedProgress
 import com.buildersledger.data.LedgerRepository
+import com.buildersledger.data.ProgressRepository
 import com.buildersledger.data.SettingsStore
 import com.buildersledger.domain.ActiveUpgrade
+import com.buildersledger.domain.ApiError
+import com.buildersledger.domain.ApiException
+import com.buildersledger.domain.PlayerApi
 import com.buildersledger.domain.CompletedUpgrade
 import com.buildersledger.domain.Resource
 import com.buildersledger.domain.ResourceState
@@ -20,6 +25,7 @@ import com.buildersledger.domain.WorkerPool
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -32,7 +38,12 @@ import kotlinx.coroutines.launch
 class LedgerViewModel(
     private val repo: LedgerRepository,
     private val settings: SettingsStore,
+    private val progressRepo: ProgressRepository,
 ) : ViewModel() {
+
+    init {
+        viewModelScope.launch { progressRepo.loadCache() }
+    }
 
     /** Null while the database is still loading, so the UI can tell "loading" from "no villages yet". */
     val villages: StateFlow<List<Village>?> = repo.villages()
@@ -155,6 +166,38 @@ class LedgerViewModel(
         viewModelScope.launch { settings.setPatienceHours(hours) }
     }
 
+    // ---- optional official-API progress ----
+    val apiTag: StateFlow<String> = settings.apiTag.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    val apiKey: StateFlow<String> = settings.apiKey.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    val apiBaseUrl: StateFlow<String> = settings.apiBaseUrl.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    val progress: StateFlow<CachedProgress?> = progressRepo.cached
+
+    private val _syncing = MutableStateFlow(false)
+    val syncing: StateFlow<Boolean> = _syncing
+    private val _syncError = MutableStateFlow<ApiError?>(null)
+    val syncError: StateFlow<ApiError?> = _syncError
+
+    /** Returns an error message, or null when the settings were saved. */
+    fun saveApiSettings(tag: String, key: String, baseUrl: String): String? {
+        val cleanTag = tag.trim()
+        val normalized = if (cleanTag.isEmpty()) "" else PlayerApi.normalizeTag(cleanTag) ?: return ApiError.BadTag.message
+        val cleanBase = baseUrl.trim()
+        if (cleanBase.isNotEmpty() && PlayerApi.normalizeBaseUrl(cleanBase) == null) return ApiError.BadBaseUrl.message
+        viewModelScope.launch { settings.setApiSettings(normalized, key.trim(), cleanBase) }
+        return null
+    }
+
+    fun syncProgress() {
+        if (_syncing.value) return
+        _syncing.value = true
+        _syncError.value = null
+        viewModelScope.launch {
+            val result = progressRepo.sync(currentVillage.value?.id)
+            _syncError.value = (result.exceptionOrNull() as? ApiException)?.error
+            _syncing.value = false
+        }
+    }
+
     // ---- import / backup ----
     fun applyImport(result: VillageImportResult, names: Map<Long, String>, onDone: (Result<ImportSummary>) -> Unit) {
         val village = currentVillage.value ?: return
@@ -176,7 +219,7 @@ class LedgerViewModel(
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as LedgerApplication
-                LedgerViewModel(app.container.repository, app.container.settings)
+                LedgerViewModel(app.container.repository, app.container.settings, app.container.progress)
             }
         }
     }
