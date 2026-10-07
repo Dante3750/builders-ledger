@@ -1,5 +1,7 @@
 # Builder's Ledger
 
+[![CI](https://github.com/Dante3750/builders-ledger/actions/workflows/ci.yml/badge.svg)](https://github.com/Dante3750/builders-ledger/actions/workflows/ci.yml)
+
 A native Android app (Kotlin, Jetpack Compose, Room) that tracks what every builder, laboratory and helper in your Clash of Clans village is doing, warns you the moment one is free, and plans the next upgrades so no worker sits idle.
 
 It is a fan-made tool. It does not touch the game: you paste the game's own **Data Export** text (or type values in), and everything stays on your device.
@@ -9,9 +11,9 @@ It is a fan-made tool. It does not touch the game: you paste the game's own **Da
 | Screen | What you get |
 |---|---|
 | **Board** | Live countdowns for every running upgrade, grouped by worker type (builders, lab, pet house...). Idle workers are called out and show the next planned upgrade with a one-tap Start. Collect finished upgrades, cancel, edit. |
-| **Planner** | A wishlist of upgrades (time, cost, priority). A scheduler orders them across your workers and shows a timeline, when each starts, and where a worker would sit idle waiting for resources. |
-| **Resources** | Balance plus income per hour for each resource. Balances keep growing with income between visits, and the planner never starts something you cannot pay for. |
-| **Insights** | How busy each worker type was, resources spent, upgrades finished, full history. |
+| **Planner** | A wishlist of upgrades (time, cost, priority, optional finish-by deadline). A scheduler orders them across your workers and shows a timeline, when each starts, where a worker would sit idle waiting for resources, and a plain-language "why now / why this order" for every entry. Impossible or missed deadlines and storage-cap warnings are called out. |
+| **Resources** | Balance, income per hour and an optional storage cap for each resource. Balances keep growing with income between visits (up to the cap), and the planner never starts something you cannot pay for. |
+| **Insights** | A weekly summary, how busy each worker type was, resources spent, upgrades finished, full history. |
 | **Sync from export** | Paste or open the game's export. Running timers are read and merged into the board. Sync again any time: it updates instead of duplicating, and moves vanished timers to history. |
 | **Settings** | Notifications (exact alarms, optional "finishing soon" reminder), planner patience, worker counts, village management, JSON backup and restore. |
 
@@ -31,15 +33,23 @@ app/
 
 Within a worker type, higher priority goes first, then longer upgrades first (which keeps the finish time short). Upgrades pay their full cost when they start; resources grow linearly with your entered income. If the top choice would make a worker wait longer than your **patience** setting for resources, a cheaper lower-priority upgrade fills the gap. Commitments are made in chronological order, so spending by one worker type is always seen by the others. Anything that can never be afforded is reported with the reason instead of silently dropped.
 
+**Storage caps.** If you enter a cap for a resource, income stops accruing while the balance sits at the cap. The planner and the Board then warn "cap reached at <time>: spend or lose income", with an estimate of what would be lost before your next planned spend. An upgrade that costs more than the cap is reported as impossible.
+
+**Deadlines.** Give a wishlist item a "finish within" time. At equal priority the earlier deadline goes first, and a deadline that is close but reachable moves the item to the front. If the deadline cannot be met even starting right now, or the plan finishes the item late, the Planner says by how much.
+
 ### Why there is no built-in cost table
 
 Upgrade costs and times are not in any official API, and taking them from the game's files is not allowed. So the app asks you for them, once per upgrade, from the numbers the game shows you. Names are not in the export either (it only has numeric ids), so you name each item once and the app remembers it.
 
-## Open it
+## Get the app
+
+**Download the debug APK from the latest Actions run:** open the [CI workflow runs](https://github.com/Dante3750/builders-ledger/actions/workflows/ci.yml), pick the newest green run and download the `builders-ledger-debug-apk` artifact (GitHub asks you to sign in to download artifacts). Unzip it, copy the APK to your phone and install it (you will need to allow installs from your file manager). It is a debug build, signed with a debug key, and meant for trying the app, not for the Play Store.
+
+### Build it yourself
 
 1. Android Studio Ladybug (2024.2) or newer, JDK 17+.
-2. Open this folder. The Gradle wrapper jar is not included; Studio will use the properties file, or run `gradle wrapper --gradle-version 8.10.2` once.
-3. Run the `app` configuration on a device or emulator (API 26+).
+2. Open this folder. The Gradle wrapper is included (`./gradlew`).
+3. Run the `app` configuration on a device or emulator (API 26+), or `./gradlew :app:assembleDebug`.
 
 Change `applicationId` / `namespace` in `app/build.gradle.kts` before publishing.
 
@@ -49,13 +59,14 @@ Change `applicationId` / `namespace` in `app/build.gradle.kts` before publishing
 ./gradlew :domain:test
 ```
 
-## Status: read this first
+## Status
 
-- The **domain module** (planner, export parser, sync, analytics, time parsing) was compiled with the Kotlin 2.0.21 compiler and its **26 unit tests pass**.
-- The **Android layers** (Room, notifications, Compose UI) could not be compiled where this was written (no Android SDK or Maven access). They were desk-checked and statically linted for bracket balance and missing imports, but **the first Gradle sync and build may surface small compile errors** (an import, a changed API signature). Expect minutes, not hours, to fix them.
-- The export parser assumes the structure of the game's data export: top-level arrays of objects with a numeric `data` id, optional `lvl` and `cnt`, and `timer` in seconds, plus `tag` and `timestamp`. If your export differs, adjust `VillageImport.kt`; there are fixture-style tests in `ImportAndTimeTest.kt` to extend. Check one real export early.
+- **CI-verified build.** Every push runs `.github/workflows/ci.yml` on GitHub Actions: the 76 domain unit tests, `:app:assembleDebug` (which compiles the Room, notification and Compose code for real) and `:app:lintDebug` (reported, not blocking). The badge above shows the state of `main`. If a build fails, error lines are written into the job annotations and an artifact with the full log is uploaded.
+- **Not yet verified on a device.** The code compiles and the domain logic is unit tested, but nobody has run the UI on a phone for this version. Expect rough edges in layout and flows, and please report them.
+- The export parser assumes the structure of the game's data export: top-level arrays of objects with a numeric `data` id, optional `lvl` and `cnt`, and `timer` in seconds, plus `tag` and `timestamp`. It tolerates missing or unknown fields, extra top-level keys, numbers written as strings, a wrapper object, code fences around the text, and timestamps in seconds, milliseconds or microseconds. Check one real export early; fixture tests in `domain/src/test` are easy to extend.
 - Upgrades created by a sync have no known start time, so their progress bars count from the sync.
-- Resource storage caps are not modelled.
+- Storage caps are per resource and manual: the app does not know your storages' real capacity until you enter it.
+- Database schema is version 2 (caps and deadlines); an existing v1 database migrates automatically, and old backup files still restore.
 
 ## Rules this app is built to respect
 
