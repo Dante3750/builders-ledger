@@ -10,6 +10,14 @@ What it does (and nothing more):
 - Caches good responses for 60 s and limits each client to 30 requests/min (be kind to the API).
 - Turns a rejected key into a clear "is this server's IP registered?" message.
 
+## Quick start (one file)
+
+```bash
+node start.mjs
+```
+
+It shows this machine's public IP, tells you to create a key for that IP, asks you to paste the key (hidden), saves it in `~/.ledger-proxy.json` (owner-only), generates the proxy password, starts the proxy, and, if `cloudflared` is installed, opens a free HTTPS tunnel and prints the three values to type into the app. The manual steps below explain the same thing in detail.
+
 ## Set it up (about 10 minutes)
 
 1. **Pick a host with a stable public IP.** A small cloud VM (any provider's cheapest tier) is the reliable choice. A home PC works only while your ISP keeps your IP.
