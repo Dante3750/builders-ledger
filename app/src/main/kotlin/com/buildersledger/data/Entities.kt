@@ -107,6 +107,7 @@ data class WishEntity(
     val costAmount: Long,
     val costResource: String?,
     val priority: Int,
+    val finishByMs: Long? = null,
 )
 
 @Serializable
@@ -156,6 +157,8 @@ data class ResourceEntity(
     val amount: Long,
     val incomePerHour: Long,
     val updatedAtMs: Long,
+    /** Optional storage cap; null = not set. */
+    val capacity: Long? = null,
 )
 
 /** Maps an in-game data id (from the village export) to a name the player gave it. */
@@ -189,12 +192,13 @@ fun ActiveUpgrade.toEntity() = ActiveEntity(
 fun WishEntity.toDomain() = WishlistItem(
     id = id, villageId = villageId, poolId = poolId, name = name, fromLevel = fromLevel, toLevel = toLevel,
     durationSeconds = durationSeconds, costAmount = costAmount, costResource = Resource.fromName(costResource),
-    priority = priority,
+    priority = priority, finishByMs = finishByMs,
 )
 
 fun WishlistItem.toEntity() = WishEntity(
     id = id, villageId = villageId, poolId = poolId, name = name, fromLevel = fromLevel, toLevel = toLevel,
     durationSeconds = durationSeconds, costAmount = costAmount, costResource = costResource?.name, priority = priority,
+    finishByMs = finishByMs,
 )
 
 fun HistoryEntity.toDomain() = CompletedUpgrade(
@@ -211,5 +215,8 @@ fun CompletedUpgrade.toEntity() = HistoryEntity(
 
 fun ResourceEntity.toDomain(): ResourceState? {
     val r = Resource.fromName(resource) ?: return null
-    return ResourceState(r, amount, incomePerHour, updatedAtMs)
+    return ResourceState(r, amount, incomePerHour, updatedAtMs, capacity)
 }
+
+fun ResourceState.toEntity(villageId: Long) =
+    ResourceEntity(villageId, resource.name, amount, incomePerHour, updatedAtMs, capacity)

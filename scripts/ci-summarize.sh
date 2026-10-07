@@ -4,7 +4,7 @@
 log="${1:-build.log}"
 [ -f "$log" ] || exit 0
 errs=$(grep -E '^e: |error:|^> Task .* FAILED|What went wrong|^\* What|AAPT|Execution failed|FAILURE|Could not|Unresolved|ksp' "$log" | sed -E 's|file://||; s|/home/runner/work/[^/]+/[^/]+/||' | awk '!seen[$0]++' | head -60)
-[ -n "$errs" ] || errs="(no matching error lines; see uploaded build.log artifact)"
+[ -n "$errs" ] || exit 0
 # Single multi-line annotation (newlines must be %0A in workflow commands).
 enc=$(printf '%s' "$errs" | sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g')
 echo "::error title=Build errors::$enc"

@@ -65,12 +65,34 @@ fun InsightsScreen(vm: LedgerViewModel, padding: PaddingValues) {
     val finished = history.filter { !it.cancelled && it.endedAtMs in start..now }
     val averageSeconds = if (finished.isEmpty()) 0L else finished.sumOf { (it.endedAtMs - it.startedAtMs) / 1000L } / finished.size
     val poolNames = pools.associate { it.id to it.name }
+    val weekly = remember(pools, history, active, now / 60_000L) { Analytics.weeklySummary(pools, history, active, now) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        item(key = "weekly") {
+            ElevatedCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("This week", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        "The last 7 days, up to ${Fmt.whenText(weekly.windowEndMs)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    weekly.highlights.forEach { line -> Text(line, style = MaterialTheme.typography.bodyMedium) }
+                    if (weekly.isEmpty) {
+                        Text(
+                            "Start or sync a few upgrades and a weekly summary will appear here.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+
         item(key = "window") {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(7, 30, 90).forEach { days ->

@@ -3,6 +3,7 @@
 package com.buildersledger.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -108,6 +109,10 @@ fun PlannerScreen(vm: LedgerViewModel, padding: PaddingValues) {
     ) {
         item(key = "summary") { PlanSummary(plan, resources, now) }
 
+        if (plan.deadlineWarnings.isNotEmpty() || plan.capWarnings.isNotEmpty()) {
+            item(key = "warnings") { WarningsCard(plan) }
+        }
+
         if (wishlist.isNotEmpty() || active.isNotEmpty()) {
             item(key = "timeline") { Timeline(plan, pools, active, now) }
         }
@@ -158,6 +163,8 @@ fun PlannerScreen(vm: LedgerViewModel, padding: PaddingValues) {
                             when (u.reason) {
                                 UnplannedReason.NO_WORKER_POOL -> "Its worker pool no longer exists. Edit it and pick another."
                                 UnplannedReason.NO_SLOTS -> "That worker pool has no slots. Set its count in Settings."
+                                UnplannedReason.EXCEEDS_CAP ->
+                                    "It costs more ${u.item.costResource?.label ?: "resource"} than your storage cap can ever hold. Check the cap on the Resources tab or the cost."
                                 UnplannedReason.NEVER_AFFORDABLE ->
                                     "You will not have enough ${u.item.costResource?.label ?: "resources"} for this. Enter an income per hour on the Resources tab, or lower the cost."
                             },
@@ -361,6 +368,7 @@ private fun WishCard(item: WishlistItem, poolName: String, onEdit: () -> Unit, o
                     cost,
                     poolName,
                     "priority ${item.priority}",
+                    item.finishByMs?.let { "by ${Fmt.whenText(it)}" },
                 ).joinToString(" · ")
                 Text(details, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -371,8 +379,45 @@ private fun WishCard(item: WishlistItem, poolName: String, onEdit: () -> Unit, o
 }
 
 @Composable
+private fun WarningsCard(plan: PlanResult) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Heads up", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onErrorContainer)
+            for (w in plan.deadlineWarnings) {
+                Column {
+                    Text(
+                        "Deadline: ${w.item.name}",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                    )
+                    Text(w.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
+                }
+            }
+            for (w in plan.capWarnings) {
+                Column {
+                    Text(
+                        "${w.resource.label} storage cap: ${Fmt.whenText(w.reachedAtMs)}",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                    )
+                    Text(w.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun PlanRow(entry: PlanEntry, pool: WorkerPool?, now: Long) {
-    Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    var expanded by remember { mutableStateOf(false) }
+    Row(
+        Modifier.fillMaxWidth().clickable { expanded = !expanded },
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         Column(Modifier.width(112.dp)) {
             Text(
                 if (entry.startMs <= now) "Start now" else Fmt.whenText(entry.startMs),
@@ -392,6 +437,22 @@ private fun PlanRow(entry: PlanEntry, pool: WorkerPool?, now: Long) {
                 style = MaterialTheme.typography.bodySmall,
                 color = if (entry.waitedMs > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            entry.lateByMs?.let {
+                Text(
+                    "Misses its deadline by ${Fmt.countdown(it)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            if (entry.explanation.isNotBlank()) {
+                Text(
+                    entry.explanation,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = if (expanded) Int.MAX_VALUE else 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }

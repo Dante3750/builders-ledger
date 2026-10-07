@@ -50,6 +50,7 @@ fun ResourcesScreen(vm: LedgerViewModel, padding: PaddingValues) {
 
     val amountEdits = remember(village?.id) { mutableStateMapOf<Resource, String>() }
     val incomeEdits = remember(village?.id) { mutableStateMapOf<Resource, String>() }
+    val capEdits = remember(village?.id) { mutableStateMapOf<Resource, String>() }
     var saved by remember { mutableStateOf(false) }
 
     LazyColumn(
@@ -93,6 +94,27 @@ fun ResourcesScreen(vm: LedgerViewModel, padding: PaddingValues) {
                             modifier = Modifier.weight(1f),
                         )
                     }
+                    NumberField(
+                        value = capEdits[resource] ?: (state?.capacity?.toString() ?: ""),
+                        onValueChange = {
+                            capEdits[resource] = it
+                            saved = false
+                        },
+                        label = "Storage cap (optional)",
+                        supporting = "Income stops when storage is full. Leave empty if you do not want warnings.",
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    val capEditValue = capEdits[resource]?.toLongOrNull() ?: if (capEdits.containsKey(resource)) null else state?.capacity
+                    val shownState = state?.copy(capacity = capEditValue)
+                    val fullAt = shownState?.capReachedAtMs(now)
+                    if (fullAt != null) {
+                        Text(
+                            if (fullAt <= now) "Storage is full: spend it or lose income."
+                            else "Cap reached ${Fmt.whenText(fullAt)}, spend or lose income.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                     if (wanted > 0) {
                         val short = wanted - haveNow
                         Text(
@@ -106,23 +128,26 @@ fun ResourcesScreen(vm: LedgerViewModel, padding: PaddingValues) {
         }
         item(key = "save") {
             Button(
-                enabled = amountEdits.isNotEmpty() || incomeEdits.isNotEmpty(),
+                enabled = amountEdits.isNotEmpty() || incomeEdits.isNotEmpty() || capEdits.isNotEmpty(),
                 onClick = {
                     val updated = Resource.entries.mapNotNull { r ->
                         val a = amountEdits[r]
                         val i = incomeEdits[r]
-                        if (a == null && i == null) return@mapNotNull null
+                        val c = capEdits[r]
+                        if (a == null && i == null && c == null) return@mapNotNull null
                         val existing = resources[r]
                         ResourceState(
                             resource = r,
                             amount = a?.toLongOrNull() ?: existing?.amountAt(now) ?: 0L,
                             incomePerHour = i?.toLongOrNull() ?: existing?.incomePerHour ?: 0L,
                             updatedAtMs = System.currentTimeMillis(),
+                            capacity = if (c != null) c.toLongOrNull()?.takeIf { it > 0L } else existing?.capacity,
                         )
                     }
                     vm.saveResources(updated)
                     amountEdits.clear()
                     incomeEdits.clear()
+                    capEdits.clear()
                     saved = true
                 },
                 modifier = Modifier.fillMaxWidth(),
