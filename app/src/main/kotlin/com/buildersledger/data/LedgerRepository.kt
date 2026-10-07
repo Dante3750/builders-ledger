@@ -172,9 +172,7 @@ class LedgerRepository(
 
     suspend fun saveResources(villageId: Long, states: List<ResourceState>) {
         db.withTransaction {
-            states.forEach {
-                dao.upsertResource(ResourceEntity(villageId, it.resource.name, it.amount, it.incomePerHour, it.updatedAtMs))
-            }
+            states.forEach { dao.upsertResource(it.toEntity(villageId)) }
         }
     }
 
@@ -357,7 +355,9 @@ class LedgerRepository(
         val state = current?.toDomain() ?: ResourceState(resource, 0L, 0L, nowMs)
         val balance = state.amountAt(nowMs)
         dao.upsertResource(
-            ResourceEntity(villageId, resource.name, (balance - amount).coerceAtLeast(0L), state.incomePerHour, nowMs)
+            ResourceEntity(
+                villageId, resource.name, (balance - amount).coerceAtLeast(0L), state.incomePerHour, nowMs, state.capacity,
+            )
         )
     }
 }

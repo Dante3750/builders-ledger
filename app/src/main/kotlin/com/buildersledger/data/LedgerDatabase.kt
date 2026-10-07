@@ -9,6 +9,8 @@ import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Update
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -161,14 +163,24 @@ interface LedgerDao {
         ResourceEntity::class,
         LabelEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class LedgerDatabase : RoomDatabase() {
     abstract fun dao(): LedgerDao
 
     companion object {
+        /** v1 -> v2: optional storage cap per resource and optional finish-by deadline per wishlist item. */
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE resources ADD COLUMN capacity INTEGER")
+                db.execSQL("ALTER TABLE wishlist ADD COLUMN finishByMs INTEGER")
+            }
+        }
+
         fun create(context: Context): LedgerDatabase =
-            Room.databaseBuilder(context.applicationContext, LedgerDatabase::class.java, "ledger.db").build()
+            Room.databaseBuilder(context.applicationContext, LedgerDatabase::class.java, "ledger.db")
+                .addMigrations(MIGRATION_1_2)
+                .build()
     }
 }

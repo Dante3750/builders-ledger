@@ -60,6 +60,10 @@ class LedgerViewModel(
 
     val labels: StateFlow<Map<Long, String>> = repo.labels().stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
     val leadMinutes: StateFlow<Int> = settings.leadMinutes.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+    /** Null until DataStore has answered, so the onboarding card never flashes for returning players. */
+    val onboardingDone: StateFlow<Boolean?> = settings.onboardingDone
+        .map<Boolean, Boolean?> { it }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val patienceHours: StateFlow<Int> = settings.patienceHours.stateIn(viewModelScope, SharingStarted.Eagerly, 1)
 
     // ---- villages ----
@@ -133,6 +137,10 @@ class LedgerViewModel(
 
     fun setLabel(dataId: Long, name: String) {
         viewModelScope.launch { repo.setLabel(dataId, name) }
+    }
+
+    fun dismissOnboarding() {
+        viewModelScope.launch { settings.setOnboardingDone() }
     }
 
     // ---- settings ----

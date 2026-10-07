@@ -42,6 +42,7 @@ class UpgradeFormState(
     resource: Resource = Resource.GOLD,
     poolId: Long? = null,
     priority: Int = 3,
+    deadline: String = "",
 ) {
     var name by mutableStateOf(name)
     var from by mutableStateOf(from)
@@ -51,9 +52,14 @@ class UpgradeFormState(
     var resource by mutableStateOf(resource)
     var poolId by mutableStateOf(poolId)
     var priority by mutableStateOf(priority)
+    var deadline by mutableStateOf(deadline)
 
     val seconds: Long? get() = TimeFormat.parse(time)
     val costAmount: Long get() = cost.toLongOrNull() ?: 0L
+
+    /** Blank = no deadline. Otherwise the parsed "finish within" span in seconds, or null when unreadable. */
+    val deadlineSeconds: Long? get() = if (deadline.isBlank()) null else TimeFormat.parse(deadline)
+    val deadlineOk: Boolean get() = deadline.isBlank() || TimeFormat.parse(deadline) != null
 }
 
 @Composable
@@ -64,6 +70,7 @@ private fun UpgradeForm(
     nameHint: String?,
     timeLabel: String,
     showPriority: Boolean,
+    showDeadline: Boolean = false,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(
@@ -98,6 +105,27 @@ private fun UpgradeForm(
         }
 
         if (showPriority) PriorityPicker(state.priority) { state.priority = it }
+
+        if (showDeadline) {
+            val parsed = state.deadlineSeconds
+            OutlinedTextField(
+                value = state.deadline,
+                onValueChange = { state.deadline = it },
+                label = { Text("Finish within (optional)") },
+                singleLine = true,
+                isError = !state.deadlineOk,
+                supportingText = {
+                    Text(
+                        when {
+                            state.deadline.isBlank() -> "A deadline, counted from now, e.g. 5d. The planner warns if it cannot be met."
+                            parsed == null -> "Use d, h, m and s, for example 5d 12h"
+                            else -> "= done by ${Fmt.whenText(System.currentTimeMillis() + parsed * 1000L)}"
+                        }
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 }
 
@@ -198,6 +226,10 @@ fun WishEditorDialog(
     onDismiss: () -> Unit,
     onSave: (WishlistItem) -> Unit,
 ) {
+    val nowAtOpen = remember { System.currentTimeMillis() }
+    val initialDeadline = remember(initial) {
+        initial?.finishByMs?.let { TimeFormat.duration(((it - nowAtOpen) / 1000L).coerceAtLeast(0L)) } ?: ""
+    }
     val state = remember(initial) {
         UpgradeFormState(
             name = initial?.name ?: "",
@@ -208,9 +240,10 @@ fun WishEditorDialog(
             resource = initial?.costResource ?: Resource.GOLD,
             poolId = initial?.poolId ?: pools.firstOrNull()?.id,
             priority = initial?.priority ?: 3,
+            deadline = initialDeadline,
         )
     }
-    val canSave = state.name.isNotBlank() && state.seconds != null && state.poolId != null
+    val canSave = state.name.isNotBlank() && state.seconds != null && state.poolId != null && state.deadlineOk
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -224,6 +257,7 @@ fun WishEditorDialog(
                     nameHint = null,
                     timeLabel = "How long it takes",
                     showPriority = true,
+                    showDeadline = true,
                 )
             }
         },
@@ -234,6 +268,11 @@ fun WishEditorDialog(
                     val seconds = state.seconds ?: return@TextButton
                     val poolId = state.poolId ?: return@TextButton
                     val amount = state.costAmount
+                    val untouchedDeadline = initial != null && state.deadline == initialDeadline
+                    val finishBy = when {
+                        untouchedDeadline -> initial!!.finishByMs
+                        else -> state.deadlineSeconds?.let { System.currentTimeMillis() + it * 1000L }
+                    }
                     onSave(
                         WishlistItem(
                             id = initial?.id ?: 0L,
@@ -246,6 +285,7 @@ fun WishEditorDialog(
                             costAmount = amount,
                             costResource = if (amount > 0) state.resource else null,
                             priority = state.priority,
+                            finishByMs = finishBy,
                         )
                     )
                 },

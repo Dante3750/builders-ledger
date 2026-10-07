@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.buildersledger.data.isPlaceholderName
 import com.buildersledger.domain.ActiveUpgrade
+import com.buildersledger.domain.CapWarning
 import com.buildersledger.domain.PlanEntry
 import com.buildersledger.domain.PlanInput
 import com.buildersledger.domain.Planner
@@ -90,6 +91,7 @@ private fun HomeContent(vm: LedgerViewModel, village: Village, padding: PaddingV
     val labels by vm.labels.collectAsStateWithLifecycle()
     val history by vm.history.collectAsStateWithLifecycle()
     val patience by vm.patienceHours.collectAsStateWithLifecycle()
+    val onboardingDone by vm.onboardingDone.collectAsStateWithLifecycle()
 
     val now by rememberNowMs(1000L)
 
@@ -122,6 +124,14 @@ private fun HomeContent(vm: LedgerViewModel, village: Village, padding: PaddingV
                     onCollectAll = { vm.collectAllDone() },
                     onImport = onOpenImport,
                 )
+            }
+            if (onboardingDone == false) {
+                item(key = "onboarding") {
+                    OnboardingCard(onOpenImport = onOpenImport, onDismiss = { vm.dismissOnboarding() })
+                }
+            }
+            if (plan.capWarnings.isNotEmpty()) {
+                item(key = "cap-warnings") { CapWarningsCard(plan.capWarnings.take(3), now) }
             }
             if (pools.isEmpty()) {
                 item(key = "nopools") {
@@ -326,6 +336,63 @@ private fun IdleCard(suggestion: PlanEntry?, onStart: (PlanEntry) -> Unit, onAdd
                 Button(onClick = { onStart(suggestion) }) { Text("Start") }
             } else {
                 TextButton(onClick = onAdd) { Text("Add") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OnboardingCard(onOpenImport: () -> Unit, onDismiss: () -> Unit) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                "Start here: sync from export",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Text(
+                "The game can copy your village as text. In the game open Settings, then More Settings, then Data Export, " +
+                    "and copy it. Then tap Sync from export here and paste it. Builder's Ledger reads the running timers, " +
+                    "fills your board and sets reminders. Sync again whenever you like: it updates instead of duplicating. " +
+                    "Everything stays on this device.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = {
+                    onDismiss()
+                    onOpenImport()
+                }) { Text("Sync from export") }
+                TextButton(onClick = onDismiss) { Text("Got it") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CapWarningsCard(warnings: List<CapWarning>, now: Long) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            for (w in warnings) {
+                val whenText = if (w.reachedAtMs <= now) "is full" else "cap reached at ${Fmt.whenText(w.reachedAtMs)}"
+                Text(
+                    "${w.resource.label} $whenText: spend or lose income",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                )
+                if (w.lostAmount > 0L) {
+                    Text(
+                        "About ${Fmt.compact(w.lostAmount)} would be lost before your next planned spend.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                    )
+                }
             }
         }
     }
