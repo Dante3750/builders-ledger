@@ -76,6 +76,8 @@ data class WishlistItem(
     val costResource: Resource?,
     /** 1 (low) to 5 (high). */
     val priority: Int,
+    /** Optional absolute deadline (epoch ms): the player wants this upgrade finished by then. */
+    val finishByMs: Long? = null,
 )
 
 /** History row, written when an upgrade is collected or cancelled. */
@@ -96,17 +98,38 @@ data class CompletedUpgrade(
 /**
  * What the player has of one resource, as entered at [updatedAtMs], plus how fast it comes in.
  * The balance keeps growing with income after the entry time, so it stays useful between edits.
- * Storage caps are not modelled.
+ *
+ * [capacity] is the optional storage cap. When set, income stops accruing once the balance reaches it
+ * (a balance that was already entered above the cap is simply kept, never reduced).
  */
 data class ResourceState(
     val resource: Resource,
     val amount: Long,
     val incomePerHour: Long,
     val updatedAtMs: Long = 0L,
+    val capacity: Long? = null,
 ) {
+    private val cap: Long? get() = capacity?.takeIf { it > 0L }
+
     fun amountAt(nowMs: Long): Long {
         val elapsed = (nowMs - updatedAtMs).coerceAtLeast(0L)
-        return amount + incomePerHour.coerceAtLeast(0L) * elapsed / 3_600_000L
+        val grown = amount + incomePerHour.coerceAtLeast(0L) * elapsed / 3_600_000L
+        val c = cap ?: return grown
+        return minOf(grown, maxOf(c, amount))
+    }
+
+    /**
+     * When the storage fills up (epoch ms), assuming nothing is spent. Null when there is no cap or no income.
+     * Returns [nowMs] when the storage is already full.
+     */
+    fun capReachedAtMs(nowMs: Long): Long? {
+        val c = cap ?: return null
+        val income = incomePerHour
+        if (income <= 0L) return null
+        val have = amountAt(nowMs)
+        if (have >= c) return nowMs
+        val waitMs = ((c - have) * 3_600_000L + income - 1) / income
+        return nowMs + waitMs
     }
 }
 

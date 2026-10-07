@@ -17,6 +17,22 @@ object TimeFormat {
         }
     }
 
+    /** 1_250_000 -> "1.25M", 45_000 -> "45k", 900 -> "900". Short form for tight screens and messages. */
+    fun compact(value: Long): String {
+        val v = kotlin.math.abs(value)
+        val sign = if (value < 0) "-" else ""
+        fun trim(x: Double): String {
+            val t = (kotlin.math.round(x * 100.0) / 100.0).toString()
+            return if (t.endsWith(".0")) t.dropLast(2) else t
+        }
+        return when {
+            v >= 1_000_000_000L -> sign + trim(v / 1_000_000_000.0) + "B"
+            v >= 1_000_000L -> sign + trim(v / 1_000_000.0) + "M"
+            v >= 10_000L -> sign + trim(v / 1_000.0) + "k"
+            else -> "$value"
+        }
+    }
+
     private val TOKEN = Regex("""(\d+)\s*([dhms])""", RegexOption.IGNORE_CASE)
 
     /**
