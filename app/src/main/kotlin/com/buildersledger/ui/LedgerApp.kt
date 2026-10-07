@@ -4,7 +4,11 @@ package com.buildersledger.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -24,6 +28,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -34,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -46,6 +54,7 @@ import com.buildersledger.ui.screens.HomeScreen
 import com.buildersledger.ui.screens.ImportScreen
 import com.buildersledger.ui.screens.InsightsScreen
 import com.buildersledger.ui.screens.PlannerScreen
+import com.buildersledger.ui.screens.ProgressScreen
 import com.buildersledger.ui.screens.ResourcesScreen
 import com.buildersledger.ui.screens.SettingsScreen
 
@@ -154,7 +163,9 @@ fun LedgerApp(vm: LedgerViewModel) {
             }
             composable(Route.Planner) { PlannerScreen(vm, padding) }
             composable(Route.Resources) { ResourcesScreen(vm, padding) }
-            composable(Route.Insights) { InsightsScreen(vm, padding) }
+            composable(Route.Insights) {
+                InsightsHost(vm, padding, onOpenSettings = { nav.navigate(Route.Settings) })
+            }
             composable(Route.Import) { ImportScreen(vm, padding, onDone = { goTab(Route.Home) }) }
             composable(Route.Settings) { SettingsScreen(vm, padding) }
         }
@@ -209,6 +220,31 @@ private fun VillageSwitcher(
                     onNew()
                 },
             )
+        }
+    }
+}
+
+/** Insights has two views behind a toggle, which keeps the bottom bar at four tabs. */
+@Composable
+private fun InsightsHost(vm: LedgerViewModel, padding: PaddingValues, onOpenSettings: () -> Unit) {
+    var showProgress by remember { mutableStateOf(false) }
+    val labels = listOf("Activity", "Progress")
+    Column(Modifier.padding(padding)) {
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+            labels.forEachIndexed { index, label ->
+                SegmentedButton(
+                    selected = (index == 1) == showProgress,
+                    onClick = { showProgress = index == 1 },
+                    shape = SegmentedButtonDefaults.itemShape(index, labels.size),
+                ) { Text(label) }
+            }
+        }
+        Box(Modifier.weight(1f)) {
+            if (showProgress) {
+                ProgressScreen(vm, PaddingValues(0.dp), onOpenSettings)
+            } else {
+                InsightsScreen(vm, PaddingValues(0.dp))
+            }
         }
     }
 }

@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -17,6 +18,11 @@ class SettingsStore(private val context: Context) {
     private val leadMinutesKey = intPreferencesKey("lead_minutes")
     private val patienceHoursKey = intPreferencesKey("patience_hours")
     private val onboardingDoneKey = booleanPreferencesKey("onboarding_done")
+
+    private val apiTagKey = stringPreferencesKey("api_player_tag")
+    private val apiKeyKey = stringPreferencesKey("api_key")
+    private val apiBaseUrlKey = stringPreferencesKey("api_base_url")
+    private val progressSyncedAtKey = longPreferencesKey("progress_synced_at")
 
     private val data: Flow<Preferences> get() = context.settingsDataStore.data
 
@@ -46,5 +52,24 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setPatienceHours(hours: Int) {
         context.settingsDataStore.edit { it[patienceHoursKey] = hours }
+    }
+
+    // ---- optional official-API sync. The key is stored on the device in plain DataStore (app-private, not encrypted). ----
+
+    val apiTag: Flow<String> = data.map { it[apiTagKey].orEmpty() }
+    val apiKey: Flow<String> = data.map { it[apiKeyKey].orEmpty() }
+    val apiBaseUrl: Flow<String> = data.map { it[apiBaseUrlKey].orEmpty() }
+    val progressSyncedAt: Flow<Long?> = data.map { it[progressSyncedAtKey] }
+
+    suspend fun setApiSettings(tag: String, key: String, baseUrl: String) {
+        context.settingsDataStore.edit {
+            it[apiTagKey] = tag
+            it[apiKeyKey] = key
+            it[apiBaseUrlKey] = baseUrl
+        }
+    }
+
+    suspend fun setProgressSyncedAt(ms: Long) {
+        context.settingsDataStore.edit { it[progressSyncedAtKey] = ms }
     }
 }

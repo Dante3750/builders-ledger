@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import com.buildersledger.data.LedgerDatabase
 import com.buildersledger.data.LedgerRepository
+import com.buildersledger.data.ProgressRepository
 import com.buildersledger.data.SettingsStore
 import com.buildersledger.notify.UpgradeAlarmScheduler
 import kotlinx.coroutines.CoroutineScope
@@ -17,6 +18,7 @@ class AppContainer(context: Context) {
     val scheduler = UpgradeAlarmScheduler(context).also { it.ensureChannels() }
     private val database = LedgerDatabase.create(context)
     val repository = LedgerRepository(database, scheduler, settings)
+    val progress = ProgressRepository(context.applicationContext, settings, repository)
 }
 
 class LedgerApplication : Application() {
