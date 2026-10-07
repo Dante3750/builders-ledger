@@ -280,8 +280,16 @@ object PlayerApi {
 
     // ---- tolerant JSON readers: wrong types and nulls just read as "absent" ----
 
-    private fun JsonObject.str(key: String): String? =
-        (this[key] as? JsonPrimitive)?.takeIf { it !is JsonNull }?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }
+    /** Plain string, or a localized-name object like {"en":"Barbarian"} (the official schema calls it JsonLocalizedName). */
+    private fun JsonObject.str(key: String): String? {
+        val v = this[key]
+        val text = when (v) {
+            is JsonPrimitive -> v.takeIf { it !is JsonNull }?.contentOrNull
+            is JsonObject -> ((v["en"] ?: v.values.firstOrNull()) as? JsonPrimitive)?.contentOrNull
+            else -> null
+        }
+        return text?.trim()?.takeIf { it.isNotEmpty() }
+    }
 
     private fun JsonObject.int(key: String): Int? {
         val p = (this[key] as? JsonPrimitive)?.takeIf { it !is JsonNull } ?: return null

@@ -254,4 +254,9 @@ class PlayerApiTest {
         assertEquals("r: m", PlayerApi.errorDetail("""{"reason":"r","message":"m","extra":1}"""))
         assertEquals("only", PlayerApi.errorDetail("""{"reason":"only","message":"only"}"""))
     }
+
+    @Test fun acceptsLocalizedNameObjects() {
+        val p = PlayerApi.parse("""{"townHallLevel":14,"troops":[{"name":{"en":"Barbarian"},"level":8,"maxLevel":10,"village":"home"}]}""")
+        assertEquals("Barbarian", p.items.first().name)
+    }
 }
