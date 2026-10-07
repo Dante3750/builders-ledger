@@ -101,6 +101,10 @@ Change `applicationId` / `namespace` in `app/build.gradle.kts` before publishing
 - Storage caps are per resource and manual: the app does not know your storages' real capacity until you enter it.
 - Database schema is version 2 (caps and deadlines); an existing v1 database migrates automatically, and old backup files still restore.
 
+### Own proxy instead of a community one
+
+`proxy/` contains `ledger-proxy`, a small zero-dependency server you can host yourself so the real API key never leaves your server. See `proxy/README.md`.
+
 ## Rules this app is built to respect
 
 - Fan content only: no cheats, bots, automation, private servers, mods or reverse-engineering, and no game assets or Supercell trademarks.
